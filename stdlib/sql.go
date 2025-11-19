@@ -15,8 +15,8 @@ import (
 )
 
 var defaultTimeFields = []string{
-	"created_at", "updated_at", "deleted_at",
-	"creation_time", "update_time", "delete_time",
+	"created_at", "updated_at", "deleted_at", "ping_date_time",
+	"creation_time", "update_time", "delete_time", "last_notified_at",
 }
 
 func init() {
