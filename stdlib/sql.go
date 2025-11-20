@@ -6,7 +6,6 @@ import (
 	"database/sql/driver"
 	"errors"
 	"io"
-	"math"
 	"slices"
 	"strings"
 	"time"
@@ -174,39 +173,49 @@ func (r *Rows) Next(dest []driver.Value) (err error) {
 		case time.Time:
 			dest[i] = row[i].(time.Time)
 		case float64:
-			fv := row[i].(float64)
-			if math.Trunc(fv) == fv {
-				dest[i] = int64(fv)
-			} else {
-				dest[i] = fv
-			}
+			dest[i] = row[i].(float64)
+		case float32:
+			dest[i] = row[i].(float32)
 		case int64:
 			dest[i] = row[i].(int64)
+		case int32:
+			dest[i] = row[i].(int32)
+		case int16:
+			dest[i] = row[i].(int16)
+		case int8:
+			dest[i] = row[i].(int8)
+		case uint64:
+			dest[i] = row[i].(uint64)
+		case uint32:
+			dest[i] = row[i].(uint32)
+		case uint16:
+			dest[i] = row[i].(uint16)
+		case uint8:
+			dest[i] = row[i].(uint8)
 		case string:
-			sv := row[i].(string)
-			if slices.Contains(defaultTimeFields, strings.ToLower(r.results.Columns[i])) {
-				dest[i], err = time.Parse(time.RFC3339Nano, sv)
-				if err != nil {
-					d1.Trace("Rows.Next parse time string failed: %s", err)
-					return err
+			colName := strings.ToLower(r.results.Columns[i])
+			if slices.Contains(defaultTimeFields, colName) {
+				if t, err := time.Parse(time.RFC3339Nano, row[i].(string)); err == nil {
+					dest[i] = t
+				} else {
+					dest[i] = row[i].(string)
 				}
-				continue
-			}
-
-			all := d1.IsFullyUnicodeEscaped(sv)
-			d1.Trace("Next string: %s, %t", sv, all)
-			if all {
-				bytes, err := d1.UnescapeUnicode(sv)
-				if err != nil {
-					return err
-				}
-				dest[i] = bytes
 			} else {
-				dest[i] = sv
+				all := d1.IsFullyUnicodeEscaped(row[i].(string))
+				d1.Trace("Next string: %s, %t", row[i].(string), all)
+				if all {
+					bytes, err := d1.UnescapeUnicode(row[i].(string))
+					if err != nil {
+						return err
+					}
+					dest[i] = bytes
+				} else {
+					dest[i] = row[i].(string)
+				}
 			}
 
 		case []byte:
-			dest[i] = []byte(row[i].(string))
+			dest[i] = row[i].([]byte)
 		default:
 			var err = errors.New("unsupported type")
 			return err
