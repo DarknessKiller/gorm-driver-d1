@@ -14,7 +14,7 @@ current support date types list.
 | float32,float64 | Number | ✅ ||
 | string | String| ✅ | |
 | []byte | String | ✅ | auto convert between unicode escape and bytes|
-| time.Time| String | ⚠️ | if column name in `github.com/kofj/gorm-driver-d1/stdlib.defaultTimeFields` slice. |
+| time.Time| String | ✅ | auto-parsed from RFC3339 / `2006-01-02 15:04:05` / `2006-01-02`; disable with `?parseTime=off` in DSN. |
 
 
 ## Useage

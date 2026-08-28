@@ -27,6 +27,7 @@ type Connection struct {
 	hasBeenClosed bool   //   false
 	ID            string //   generated in init()
 	client        http.Client
+	ParseTime     bool
 }
 
 // Close will mark the connection as closed. It is safe to be called
@@ -89,6 +90,17 @@ func (conn *Connection) init(dsn string) error {
 			return errors.New("invalid timeout specified: " + err.Error())
 		}
 		timeout = customTimeout
+	}
+
+	// parseTime: auto (default true) vs off/false/0 to disable
+	conn.ParseTime = true
+	if v := query.Get("parseTime"); v != "" {
+		switch strings.ToLower(v) {
+		case "0", "false", "off", "no", "disable":
+			conn.ParseTime = false
+		default:
+			conn.ParseTime = true
+		}
 	}
 
 	// Initialize http client for connection

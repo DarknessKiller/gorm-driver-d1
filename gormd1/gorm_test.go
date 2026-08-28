@@ -25,7 +25,12 @@ var datebaseId string
 func TestMain(m *testing.M) {
 	var err = godotenv.Load("../dev.env")
 	if err != nil {
-		panic(err)
+		log.Printf("dev.env not found, integration tests will be skipped: %v", err)
+		// still run unit tests like TestDeriverName that don't need DB
+		// set empty DSN to avoid nil deref in TestDialector
+		defaultDSN = ""
+		invalidDSN = "d1://a:b@c"
+		os.Exit(m.Run())
 	}
 	apiToken = os.Getenv("API_TOKEN")
 	accountId = os.Getenv("ACCOUNT_ID")
@@ -68,6 +73,9 @@ func TestDeriverName(t *testing.T) {
 }
 
 func TestDialector(t *testing.T) {
+	if defaultDSN == "" {
+		t.Skip("no dev.env, skipping integration test")
+	}
 
 	rows := []struct {
 		description  string

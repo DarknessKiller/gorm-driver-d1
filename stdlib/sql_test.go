@@ -26,7 +26,8 @@ var datebaseId string
 func TestMain(m *testing.M) {
 	var err = godotenv.Load("../dev.env")
 	if err != nil {
-		panic(err)
+		log.Printf("dev.env not found, integration tests will be skipped: %v", err)
+		os.Exit(m.Run())
 	}
 	apiToken = os.Getenv("API_TOKEN")
 	accountId = os.Getenv("ACCOUNT_ID")
@@ -76,6 +77,9 @@ func randBytes(n int) []byte {
 }
 
 func TestTable(t *testing.T) {
+	if globalDB == nil {
+		t.Skip("no dev.env, skipping integration test")
+	}
 	result, err := globalDB.Exec("CREATE TABLE IF NOT EXISTS " + testTableName() + " (id INTEGER, name VARCHAR(20), wallet REAL, bankrupt INTEGER, payload TEXT, content BLOB, created_at DATETIME)")
 	if !assert.Nilf(t, err, "create tabale failed") {
 		return
