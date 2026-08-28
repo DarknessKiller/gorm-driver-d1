@@ -3,6 +3,7 @@ package d1
 import (
 	"bytes"
 	"context"
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -146,11 +147,33 @@ func (c *Connection) WriteParameterizedContext(ctx context.Context, stmt Paramet
 
 	for idx, param := range stmt.Params {
 		Trace("%s: param[%d]: %v", c.ID, idx, param)
-		switch param := param.(type) {
+		switch v := param.(type) {
 		case time.Time:
-			stmt.Params[idx] = param.Format(time.RFC3339Nano)
+			if v.IsZero() {
+				stmt.Params[idx] = nil
+			} else {
+				stmt.Params[idx] = v.Format(time.RFC3339Nano)
+			}
+		case *time.Time:
+			if v == nil || v.IsZero() {
+				stmt.Params[idx] = nil
+			} else {
+				stmt.Params[idx] = v.Format(time.RFC3339Nano)
+			}
+		case sql.NullTime:
+			if !v.Valid || v.Time.IsZero() {
+				stmt.Params[idx] = nil
+			} else {
+				stmt.Params[idx] = v.Time.Format(time.RFC3339Nano)
+			}
+		case *sql.NullTime:
+			if v == nil || !v.Valid || v.Time.IsZero() {
+				stmt.Params[idx] = nil
+			} else {
+				stmt.Params[idx] = v.Time.Format(time.RFC3339Nano)
+			}
 		case []byte:
-			stmt.Params[idx] = BytesToUnicodeEscapes(param)
+			stmt.Params[idx] = BytesToUnicodeEscapes(v)
 		}
 	}
 

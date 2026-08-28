@@ -21,6 +21,9 @@ var bin1 = []byte{0x99, 0x21, 0x33, 0x12, 0x48, 0x55}
 var bin2 = []byte{0x33, 0x21, 0x33, 0x12, 0x48, 0x55}
 
 func TestMigrator(t *testing.T) {
+	if gdb == nil {
+		t.Skip("no dev.env, skipping integration test")
+	}
 
 	var ok = t.Run("Migrate", func(t *testing.T) {
 		var err = gdb.AutoMigrate(&User{})

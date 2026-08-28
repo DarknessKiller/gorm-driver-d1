@@ -6,17 +6,10 @@ import (
 	"database/sql/driver"
 	"errors"
 	"io"
-	"slices"
-	"strings"
 	"time"
 
 	d1 "github.com/kofj/gorm-driver-d1"
 )
-
-var defaultTimeFields = []string{
-	"created_at", "updated_at", "deleted_at", "ping_date_time",
-	"creation_time", "update_time", "delete_time", "last_notified_at",
-}
 
 func init() {
 	sql.Register(d1.DriverName, &Driver{})
@@ -116,7 +109,7 @@ func (s *Stmt) Query(args []driver.Value) (driver.Rows, error) {
 	}
 	d1.Trace("%s: Query OK: %+v", s.Conn.ID, result)
 
-	return &Rows{connId: s.Conn.ID, results: &result.Result[0].Results}, nil
+	return &Rows{connId: s.Conn.ID, results: &result.Result[0].Results, parseTime: s.Conn.ParseTime}, nil
 }
 
 // Result implements the sql/driver.Result interface.
@@ -138,9 +131,10 @@ func (r *Result) RowsAffected() (int64, error) {
 var _ driver.Rows = (*Rows)(nil)
 
 type Rows struct {
-	connId  string
-	results *d1.D1RespQueryResults
-	index   int
+	connId    string
+	results   *d1.D1RespQueryResults
+	index     int
+	parseTime bool
 }
 
 func (r *Rows) Columns() []string {
@@ -193,25 +187,23 @@ func (r *Rows) Next(dest []driver.Value) (err error) {
 		case uint8:
 			dest[i] = row[i].(uint8)
 		case string:
-			colName := strings.ToLower(r.results.Columns[i])
-			if slices.Contains(defaultTimeFields, colName) {
-				if t, err := time.Parse(time.RFC3339Nano, row[i].(string)); err == nil {
+			s := row[i].(string)
+			if r.parseTime {
+				if t, ok := tryParseTime(s); ok {
 					dest[i] = t
-				} else {
-					dest[i] = row[i].(string)
+					continue
 				}
+			}
+			all := d1.IsFullyUnicodeEscaped(s)
+			d1.Trace("Next string: %s, %t", s, all)
+			if all {
+				bytes, err := d1.UnescapeUnicode(s)
+				if err != nil {
+					return err
+				}
+				dest[i] = bytes
 			} else {
-				all := d1.IsFullyUnicodeEscaped(row[i].(string))
-				d1.Trace("Next string: %s, %t", row[i].(string), all)
-				if all {
-					bytes, err := d1.UnescapeUnicode(row[i].(string))
-					if err != nil {
-						return err
-					}
-					dest[i] = bytes
-				} else {
-					dest[i] = row[i].(string)
-				}
+				dest[i] = s
 			}
 
 		case []byte:
@@ -223,4 +215,33 @@ func (r *Rows) Next(dest []driver.Value) (err error) {
 	}
 
 	return nil
+}
+
+func tryParseTime(s string) (time.Time, bool) {
+	if len(s) < 10 {
+		return time.Time{}, false
+	}
+	// fast path: must look like date (digit at start and dash at 4)
+	// skip obvious non-dates to avoid parse cost
+	if s[4] != '-' && s[4] != '/' && s[2] != ':' {
+		// still try RFC3339 which has dash at 4, but be lenient and try anyway if contains T
+		if len(s) > 10 && s[10] != 'T' && s[10] != ' ' {
+			// not date-like, but allow fallback parse anyway
+		}
+	}
+	layouts := []string{
+		time.RFC3339Nano,
+		time.RFC3339,
+		"2006-01-02 15:04:05.999999999",
+		"2006-01-02T15:04:05.999999999",
+		"2006-01-02 15:04:05",
+		"2006-01-02T15:04:05",
+		"2006-01-02",
+	}
+	for _, l := range layouts {
+		if t, err := time.Parse(l, s); err == nil {
+			return t, true
+		}
+	}
+	return time.Time{}, false
 }
